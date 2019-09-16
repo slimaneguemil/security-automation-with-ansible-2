@@ -1,5 +1,5 @@
 - name: installing jenkins in ubuntu 16.04
-  hosts: "192.168.1.7"
+  hosts: all
   remote_user: ubuntu
   gather_facts: False
   become: True
