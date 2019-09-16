@@ -4,42 +4,50 @@
   gather_facts: False
   become: True
 
+
+---
+- name: installing jenkins method2
+  hosts: all
+  gather_facts: true
+  become: yes
+  become_method: sudo
+  tags: [jenkins]
+
   tasks:
-    - name: Install yum
+    - name: Update the software package repository
       yum:
-        name:
-          - wget
-          - java-1.8.0-openjdk
-
-    - name: Download jenkins.repo
-      get_url:
-        url: http://pkg.jenkins-ci.org/redhat-stable/jenkins.repo
-        dest: /etc/yum.repos.d/jenkins.repo
-
-    - name: Import Jenkins Key
-      rpm_key:
+        name: "*"
+        update_cache: yes
+    - name: Install dependencies
+      package:
+        name: "{{ item }}"
         state: present
-        key: https://jenkins-ci.org/redhat/jenkins-ci.org.key
-
+      with_items:
+        - java-1.8.0-openjdk
+        - git
+        - texlive-latex
+        - wget
+        - deltarpm
+    - name: Download jenkins repo
+      command: wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+    - name: Import Jenkins CI key
+      rpm_key:
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+        state: present
     - name: Install Jenkins
       yum:
-        name: jenkins
+        name: "jenkins"
         state: present
-
-    - name: Start & Enable Jenkins
-      systemd:
+    - name: Allow port 8080
+      shell: iptables -I INPUT -p tcp --dport 8080 -m state --state NEW,ESTABLISHED -j ACCEPT
+    - name: Start the server
+      service:
         name: jenkins
         state: started
-        enabled: true
-
-    - name: Sleep for 30 seconds and continue with play
-      wait_for: timeout=30
-
-    - name: Get init password Jenkins
-      shell: cat /var/lib/jenkins/secrets/initialAdminPassword
-      changed_when: false
-      register: result
-
-    - name: Print init password Jenkins
-      debug:
-        var: result.stdout
+    - wait_for:
+        port: 8080
+        command: cat /var/lib/jenkins/secrets/initialAdminPassword
+    - name: Get Admin Password
+      become: yes
+      become_method: sudo
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
